@@ -5,7 +5,7 @@ This is a port of the [Wolf ECS](https://github.com/EnderShadow8/wolf-ecs) syste
 ## Ho to use
 
 Make the necessary imports
-```
+```typescript
 import { ECS } from "./as_wolf_ecs/ecs";
 import { Component, Type, Entity } from "./as_wolf_ecs/component";
 import { Archetype } from "./as_wolf_ecs/sparse_set";
@@ -69,32 +69,32 @@ const m = [All(c0, c1, c2), Not(c3), Any([c4, c5])];
 It's possible to use simple ForEach iterators by using anonimus function.
 ```
 quer.for_each((id: Entity, ecs: ECS) => {
-	// make something with entity
+    // make something with entity
 })
 ```
 
 But it is better to create the system and run it
 ```
 class LogSystem extends System {
-	constructor(in_query: Query) {
+    constructor(in_query: Query) {
         super(in_query);
-	}
-	
-	update(dt: f32): void {
-		// use this.system_query to get entities that match the query
-	}
+    }
+    
+    update(dt: f32): void {
+        // use this.system_query to get entities that match the query
+    }
 }
 ```
 
 To get matching entities, it's possible to use query iterators
 ```
 update(dt: f32): void {
-	const quety = this.system_query;
-	quety.iterator_start();  // reset the iterator
-	while (quety.iterator_has()) {
-		const entity = quety.iterator_get();
-		// next use the entity
-	}
+    const quety = this.system_query;
+    quety.iterator_start();  // reset the iterator
+    while (quety.iterator_has()) {
+        const entity = quety.iterator_get();
+        // next use the entity
+    }
 }
 ```
 
