@@ -89,10 +89,10 @@ class LogSystem extends System {
 To get matching entities, it's possible to use query iterators
 ```typescript
 update(dt: f32): void {
-    const quety = this.system_query;
-    quety.iterator_start();  // reset the iterator
-    while (quety.iterator_has()) {
-        const entity = quety.iterator_get();
+    const query = this.system_query;
+    query.iterator_start();  // reset the iterator
+    while (query.iterator_has()) {
+        const entity = query.iterator_get();
         // next use the entity
     }
 }
