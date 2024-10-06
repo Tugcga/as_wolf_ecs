@@ -1,0 +1,10 @@
+export enum STORE {
+    T_COMPONENT_ARRAY,
+    T_COMPONENT,
+    T_COMPONENTS,
+    T_ECS,
+    T_ENTITIES,
+    T_REMOVED_ENTITY,
+    T_ACTIVE_ENTITY,
+    T_ENTITY
+}
