@@ -158,7 +158,7 @@ The original [Wolf ECS] (https://github.com/EnderShadow8/wolf-ecs) is one of the
 
 * ```update(dt: f32 = 0.0): void```  Call update methods of all registered systems
 
-* ```destroy_pending(): void``` and ```update_pending(): void``` Apply changes with active ```deffer`` mode
+* ```destroy_pending(): void``` and ```update_pending(): void``` Apply changes with active ```defer``` mode
 
 #### Get ECS data
 
@@ -247,7 +247,7 @@ These method should not be used by users
 *  ```get_entities(): Array<Entity>``` Return array of entities with a given archetype
 * ```toString(): string``` Return string representation of the archetype (mostly for debug purpose)
 
-#### #### Public methods for internal use
+#### Public methods for internal use
 
 These method should not be used by users
 
