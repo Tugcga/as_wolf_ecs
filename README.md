@@ -134,7 +134,7 @@ In this mode all changes to entities (add or remove components, destroy entity) 
 
 ## Performance
 
-The original [Wolf ECS] (https://github.com/EnderShadow8/wolf-ecs) is one of the fastest ECS libraries for JavaScript. Current AssemblyScript implementation has almost the same performance. This implementation of ECS is heavily using access to data stored in arrays. The performance of get/set data to type arrays (such as ```Int32Array```, ```Float32Array``` and so on) in JavaScript is slightly higher than set/get data to ```StaticArray``` in AssemblyScript. So the implementation of the architecture used cannot be much more efficient in AssemblyScript than in JavaScript.
+The original [Wolf ECS](https://github.com/EnderShadow8/wolf-ecs) is one of the fastest ECS libraries for JavaScript. Current AssemblyScript implementation has almost the same performance. This implementation of ECS is heavily using access to data stored in arrays. The performance of get/set data to type arrays (such as ```Int32Array```, ```Float32Array``` and so on) in JavaScript is slightly higher than set/get data to ```StaticArray``` in AssemblyScript. So the implementation of the architecture used cannot be much more efficient in AssemblyScript than in JavaScript.
 
 ## API
 
