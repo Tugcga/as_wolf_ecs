@@ -171,6 +171,117 @@ export class ECS {
         this.entity_id = 0;
     }
 
+    private _from_store(view: DataView, start: u32): void {
+        // read the header
+        let shift = start;
+        const section_id = view.getUint32(shift);
+        if (section_id != STORE.T_ECS) {
+            return;
+        }
+
+        shift += 4;
+        const bytes_length = view.getUint32(shift);
+
+        // read next section id
+        shift += 4;
+        const entities_id = view.getUint32(shift);
+        if (entities_id != STORE.T_ENTITIES) {
+            return;
+        }
+        shift += 4;
+        const entities_length = view.getUint32(shift);
+
+        // before read entities seciotn, destroy all entities
+        this._destroy_all();
+        // create all entities
+        // read the number of entities from bytes
+        shift += 4;
+        const entities_count = view.getUint32(shift);
+        for (let i: u32 = 0; i < entities_count; i++) {
+            this.create_entity();
+        }
+
+        // read removed entities section
+        shift += 4;
+        const removed_entities_id = view.getUint32(shift);
+        if (removed_entities_id != STORE.T_REMOVED_ENTITY) {
+            return;
+        }
+        shift += 4;
+        const removed_entities_length = view.getUint32(shift);
+        // we store all removed entitiea by u32, so the number of removed is length / 4
+        for (let i: u32 = 0, len = removed_entities_length / 4; i < len; i++) {
+            shift += 4;
+            const ent = view.getUint32(shift);
+            this.destroy_entity(ent);
+        }
+
+        // section of active entities
+        shift += 4;
+        const active_entities_id = view.getUint32(shift);
+        if (active_entities_id != STORE.T_ACTIVE_ENTITY) {
+            return;
+        }
+        shift += 4;
+        const active_entities_length = view.getUint32(shift);
+        // read data until we read these number of bytes
+        shift += 4;
+        let read_bytes: u32 = 0;
+        while (read_bytes < active_entities_length) {
+            // read entity section id
+            const entity_id = view.getUint32(shift + read_bytes);
+            read_bytes += 4
+            // and bytes length
+            const entity_length = view.getUint32(shift + read_bytes);
+            read_bytes += 4;
+
+            // actual entity id
+            const ent = view.getUint32(shift + read_bytes);
+            read_bytes += 4;
+            // and next array for mask
+            const mask_length = (entity_length - 4) / 4;
+            for (let i: u32 = 0; i < mask_length; i++) {
+                const mask_value = view.getUint32(shift + read_bytes);
+                read_bytes += 4;
+                // split mask value to bits
+                for (let bit: u8 = 0; bit < 32; bit++) {
+                    const v = mask_value & (1 << bit);
+                    if (v > 0) {
+                        // add component bit + 32 * i
+                        const component_index = <u32>bit + 32 * i;
+                        this.add_component(ent, this.components[component_index]);
+                    }
+                }
+            }
+        }
+        shift += read_bytes;
+
+        // next, components section
+        const components_id = view.getUint32(shift);
+        if (components_id != STORE.T_COMPONENTS) {
+            return;
+        }
+        shift += 4;
+        const components_length = view.getUint32(shift);
+        shift += 4;  // <- points to the start of the component section
+
+        // fill data for all components
+        const this_components = this.components;
+        for (let i = 0, len = this_components.length; i < len; i++) {
+            const component = this_components[i];
+
+            const component_id = view.getUint32(shift);
+            shift += 4;
+            if (component_id != STORE.T_COMPONENT) {
+                continue;
+            }
+            const component_length = view.getUint32(shift);
+            shift += 4;
+            component.from_store(view, shift - 8);
+
+            shift += component_length;
+        }
+    }
 
     //--------public methond-------
     //-----------------------------
@@ -489,118 +600,6 @@ export class ECS {
     from_store_bytes(bytes: Uint8Array): void {
         const view = new DataView(bytes.buffer);
         this.from_store(view, 0);
-    }
-
-    from_store(view: DataView, start: u32): void {
-        // read the header
-        let shift = start;
-        const section_id = view.getUint32(shift);
-        if (section_id != STORE.T_ECS) {
-            return;
-        }
-
-        shift += 4;
-        const bytes_length = view.getUint32(shift);
-
-        // read next section id
-        shift += 4;
-        const entities_id = view.getUint32(shift);
-        if (entities_id != STORE.T_ENTITIES) {
-            return;
-        }
-        shift += 4;
-        const entities_length = view.getUint32(shift);
-
-        // before read entities seciotn, destroy all entities
-        this._destroy_all();
-        // create all entities
-        // read the number of entities from bytes
-        shift += 4;
-        const entities_count = view.getUint32(shift);
-        for (let i: u32 = 0; i < entities_count; i++) {
-            this.create_entity();
-        }
-
-        // read removed entities section
-        shift += 4;
-        const removed_entities_id = view.getUint32(shift);
-        if (removed_entities_id != STORE.T_REMOVED_ENTITY) {
-            return;
-        }
-        shift += 4;
-        const removed_entities_length = view.getUint32(shift);
-        // we store all removed entitiea by u32, so the number of removed is length / 4
-        for (let i: u32 = 0, len = removed_entities_length / 4; i < len; i++) {
-            shift += 4;
-            const ent = view.getUint32(shift);
-            this.destroy_entity(ent);
-        }
-
-        // section of active entities
-        shift += 4;
-        const active_entities_id = view.getUint32(shift);
-        if (active_entities_id != STORE.T_ACTIVE_ENTITY) {
-            return;
-        }
-        shift += 4;
-        const active_entities_length = view.getUint32(shift);
-        // read data until we read these number of bytes
-        shift += 4;
-        let read_bytes: u32 = 0;
-        while (read_bytes < active_entities_length) {
-            // read entity section id
-            const entity_id = view.getUint32(shift + read_bytes);
-            read_bytes += 4
-            // and bytes length
-            const entity_length = view.getUint32(shift + read_bytes);
-            read_bytes += 4;
-
-            // actual entity id
-            const ent = view.getUint32(shift + read_bytes);
-            read_bytes += 4;
-            // and next array for mask
-            const mask_length = (entity_length - 4) / 4;
-            for (let i: u32 = 0; i < mask_length; i++) {
-                const mask_value = view.getUint32(shift + read_bytes);
-                read_bytes += 4;
-                // split mask value to bits
-                for (let bit: u8 = 0; bit < 32; bit++) {
-                    const v = mask_value & (1 << bit);
-                    if (v > 0) {
-                        // add component bit + 32 * i
-                        const component_index = <u32>bit + 32 * i;
-                        this.add_component(ent, this.components[component_index]);
-                    }
-                }
-            }
-        }
-        shift += read_bytes;
-
-        // next, components section
-        const components_id = view.getUint32(shift);
-        if (components_id != STORE.T_COMPONENTS) {
-            return;
-        }
-        shift += 4;
-        const components_length = view.getUint32(shift);
-        shift += 4;  // <- points to the start of the component section
-
-        // fill data for all components
-        const this_components = this.components;
-        for (let i = 0, len = this_components.length; i < len; i++) {
-            const component = this_components[i];
-
-            const component_id = view.getUint32(shift);
-            shift += 4;
-            if (component_id != STORE.T_COMPONENT) {
-                continue;
-            }
-            const component_length = view.getUint32(shift);
-            shift += 4;
-            component.from_store(view, shift - 8);
-
-            shift += component_length;
-        }
     }
 
     toString(): string {
