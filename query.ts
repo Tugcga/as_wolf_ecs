@@ -136,8 +136,6 @@ export class Query {
     private archetypes: Array<Archetype>;
     private ecs: ECS;
     private mask: QueryMask;
-    private update_entities_array: bool;
-    private entities_array: Array<Entity>;
 
     private iter_arch_ptr: i32;
     private iter_ent_ptr: i32;
@@ -146,11 +144,9 @@ export class Query {
     private iter_current_ents: Array<Entity> | null;
     private iter_start: bool;
 
-    constructor(ecs: ECS, raw: RawQuery, track_entities: bool) {
+    constructor(ecs: ECS, raw: RawQuery) {
         this.archetypes = new Array<Archetype>();
         this.ecs = ecs;
-        this.update_entities_array = track_entities;
-        this.entities_array = new Array<Entity>();
 
         this.mask = create_query(raw);
 
@@ -308,31 +304,6 @@ export class Query {
         }
 
         return false;
-    }
-
-    get_entities(): Array<Entity> {
-        const entities_array = this.entities_array;
-        if (this.update_entities_array) {
-            entities_array.length = 0;
-
-            const archetypes = this.archetypes;
-
-            for (let i = 0, len = archetypes.length; i < len; i++) {
-                const archetype = archetypes[i];
-                const entities = archetype.get_entities();
-                for (let j = entities.length; j > 0; j--) {
-                    entities_array.push(entities[j - 1]);
-                }
-            }
-        }
-
-        this.update_entities_array = false;
-
-        return this.entities_array;
-    }
-
-    mark_update_entities(): void {
-        this.update_entities_array = true;
     }
 
     add_archetype(arch: Archetype): void {

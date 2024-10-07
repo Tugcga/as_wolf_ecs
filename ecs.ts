@@ -32,9 +32,7 @@ export class ECS {
     private systems: Array<System>;
     private components: Array<Component>;
 
-    private track_entities: bool;
-
-    constructor(max: u32 = 10000, defer: bool = false, track_entities: bool = false) {
+    constructor(max: u32 = 10000, defer: bool = false) {
         this.MAX_ENTITIES = max;
         this.DEFAULT_DEFER = defer;
         this.component_id = 0;
@@ -50,60 +48,10 @@ export class ECS {
         this.queries = new Array<Query>();
         this.systems = new Array<System>();
         this.components = new Array<Component>();
-
-        this.track_entities = track_entities;
     }
 
-    get_max_entities(): u32 {
-        return this.MAX_ENTITIES;
-    }
-
-    get_entity_archetype(entity: Entity): Archetype {
-        return this.ent[entity];
-    }
-
-    define_component(names: Array<Symbol>, types: Array<Type>): Component {
-        assert(this.entity_id == 0, "Cannot define component after entity creation");
-
-        const component = new Component(names, types, this.MAX_ENTITIES, this.component_id);
-        // store component in the array
-        this.components.push(component);
-        this.component_id += 1;
-        return component;
-    }
-
-    get_component(component_id: i32): Component {
-        return this.components[component_id];
-    }
-
-    create_query(raw_queries: Array<RawQuery>): Query {
-        const this_arch = this.arch;
-
-        const query = new Query(this, new RawQuery(Modificator.ALL, raw_queries, []), this.track_entities);
-        const arch_keys = this_arch.keys();
-        const arch_keys_count = arch_keys.length;
-        for (let i = 0; i < arch_keys_count; i++) {
-            const k = arch_keys[i];
-            const v = this_arch.get(k);
-
-            if (Query.match(v.get_mask(), query.get_mask())) {
-                query.add_archetype(v);
-            }
-        }
-
-        this.queries.push(query);
-
-        return query;
-    }
-
-    register_system(in_system: System): void {
-        this.systems.push(in_system);
-    }
-
-    get_system(index: i32): System {
-        return this.systems[index];
-    }
-
+    //-------private methods-------
+    //-----------------------------
     private _valid_id(id: Entity): bool {
         return !(this.rm.has(id) || this.entity_id <= id);
     }
@@ -149,66 +97,13 @@ export class ECS {
         return arch.get_change_value(i);
     }
 
-    _create_entity(id: u32): void {
+    private _create_entity(id: u32): void {
         const this_empty = this.empty;
 
         this.ent[id] = this_empty;
         this.update_to[id] = this_empty;
 
         this_empty.sset_add(id);
-    }
-
-    create_entity(): Entity {
-        const this_rm = this.rm;
-        const rm_length = this_rm.packed_length();
-        if (rm_length > 0) {
-            const id = this_rm.packed_pop();
-            this._create_entity(id);
-            return id;
-        } else {
-            if (this.entity_id == 0) {
-                const mask_length: i32 = <i32>Math.ceil(<f32>this.component_id / 32.0);
-                const this_empty = this.empty;
-                const this_arch = this.arch;
-
-                this_empty.set_mask(new Uint32Array(mask_length));
-
-                this_arch.set(this_empty.mask_string(), this_empty);
-            }
-            assert(this.entity_id != this.MAX_ENTITIES, "Maximum entity limit reached");
-
-            this._create_entity(this.entity_id);
-            return this.entity_id++;
-        }
-    }
-
-    destroy_entity(id: Entity, defer: bool = this.DEFAULT_DEFER): void {
-        const this_to_destroy = this.to_destroy;
-
-        if (defer) {
-            this_to_destroy.add(id);
-        } else {
-            const this_ent = this.ent;
-            const this_rm = this.rm;
-
-            const ent_arch = this_ent[id];
-            if (this.track_entities) {
-                this._update_queries(ent_arch.get_mask());
-            }
-
-            ent_arch.sset_remove(id);
-            this_to_destroy.remove(id);
-            this_rm.add(id);
-        }
-    }
-
-    destroy_pending(): void {
-        const this_to_destroy = this.to_destroy;
-        while (this_to_destroy.packed_length() > 0) {
-            this.destroy_entity(this_to_destroy.packed_value(0), false)
-        }
-
-        this_to_destroy.reset_packed(false);
     }
 
     private _update_queries(ent_mask: Uint32Array): void {
@@ -218,119 +113,6 @@ export class ECS {
                 query.mark_update_entities();
             }
         }
-    }
-
-    add_component(id: Entity, cmp: Component, defer: bool = this.DEFAULT_DEFER): void {
-        assert(this._valid_id(id), "Invalid entity id");
-
-        const i: u32 = cmp.get_id();
-        if (defer) {
-            const this_to_update = this.to_update;
-            this_to_update.add(id);
-        } else {
-            const this_ent = this.ent;
-            let this_ent_arch = this_ent[id];
-            const ent_mask = this_ent_arch.get_mask();
-            // we shold update all queries chat math this mask
-            if (this.track_entities) {
-                this._update_queries(ent_mask);
-            }
-
-            if (!this._has_component(ent_mask, i)) {
-                this_ent_arch.sset_remove(id);
-                const arch_change = this._arch_change(this_ent_arch, i);
-                if (arch_change) {
-                    this_ent[id] = arch_change;
-                    this_ent_arch = this_ent[id];
-                }
-                
-                this_ent_arch.sset_add(id);
-
-                // and also after adding component
-                if (this.track_entities) {
-                    const new_ent_mask = this_ent_arch.get_mask();
-                    this._update_queries(new_ent_mask);
-                }
-            }
-        }
-
-        const this_update_to = this.update_to;
-        if (!this._has_component(this_update_to[id].get_mask(), i)) {
-            const arch_change = this._arch_change(this_update_to[id], i);
-            if (arch_change) {
-                this_update_to[id] = arch_change;
-            }
-        }
-    }
-
-    remove_component(id: Entity, cmp: Component, defer: bool = this.DEFAULT_DEFER): void {
-        assert(this._valid_id(id), "Invalid entity id");
-        
-        const i: u32 = cmp.get_id();
-        if (defer) {
-            const this_to_update = this.to_update;
-            this_to_update.add(id);
-        } else {
-            const this_ent = this.ent;
-            let this_ent_arch = this_ent[id];
-            const ent_mask = this_ent_arch.get_mask();
-            if (this.track_entities) {
-                this._update_queries(ent_mask);
-            }
-
-            if (this._has_component(ent_mask, i)) {
-                this_ent[id].sset_remove(id);
-                const arch_change = this._arch_change(this_ent_arch, i);
-                if (arch_change) {
-                    this_ent[id] = arch_change;
-                    this_ent_arch = arch_change;
-                }
-                this_ent_arch.sset_add(id);
-
-                if (this.track_entities) {
-                    const new_ent_mask = this_ent_arch.get_mask();
-                    this._update_queries(new_ent_mask);
-                }
-            }
-        }
-
-        const this_update_to = this.update_to;
-        if (this._has_component(this_update_to[id].get_mask(), i)) {
-            const arch_change = this._arch_change(this_update_to[id], i);
-            if (arch_change) {
-                this_update_to[id] = arch_change
-            }
-        }
-    }
-
-    update_pending(): void {
-        const this_to_update = this.to_update;
-        const this_update_to = this.update_to;
-        const this_ent = this.ent;
-
-        const arr = this_to_update.get_packed();
-        for (let i = 0, len = arr.length; i < len; i++) {
-            const id = arr[i];
-
-            if (this._valid_id(id)) {
-                this_ent[id].sset_remove(id);
-                this_ent[id] = this_update_to[id];
-                this_ent[id].sset_add(id);
-            }
-        }
-
-        this_to_update.reset_packed(true);
-    }
-
-    update(dt: f32 = 0.0): void {
-        const this_systems = this.systems;
-        for (let i = 0, len = this_systems.length; i < len; i++) {
-            const system = this_systems[i];
-            system.update(dt);
-        }
-
-        this.destroy_pending();
-        this.update_pending();
     }
 
     private _store_length(): u32 {
@@ -378,6 +160,213 @@ export class ECS {
             to_return += 4 + 4 + component.store_length();
         }
         return to_return;
+    }
+
+    private _destroy_all(): void {
+        for (let i: u32 = 0, len = this.entity_id; i < len; i++) {
+            this.destroy_entity(i);
+        }
+
+        this.rm.clear();
+        this.entity_id = 0;
+    }
+
+
+    //--------public methond-------
+    //-----------------------------
+    get_max_entities(): u32 {
+        return this.MAX_ENTITIES;
+    }
+
+    get_entity_archetype(entity: Entity): Archetype {
+        return this.ent[entity];
+    }
+
+    define_component(names: Array<Symbol>, types: Array<Type>): Component {
+        assert(this.entity_id == 0, "Cannot define component after entity creation");
+
+        const component = new Component(names, types, this.MAX_ENTITIES, this.component_id);
+        // store component in the array
+        this.components.push(component);
+        this.component_id += 1;
+        return component;
+    }
+
+    get_component(component_id: i32): Component {
+        return this.components[component_id];
+    }
+
+    create_query(raw_queries: Array<RawQuery>): Query {
+        const this_arch = this.arch;
+
+        const query = new Query(this, new RawQuery(Modificator.ALL, raw_queries, []));
+        const arch_keys = this_arch.keys();
+        const arch_keys_count = arch_keys.length;
+        for (let i = 0; i < arch_keys_count; i++) {
+            const k = arch_keys[i];
+            const v = this_arch.get(k);
+
+            if (Query.match(v.get_mask(), query.get_mask())) {
+                query.add_archetype(v);
+            }
+        }
+
+        this.queries.push(query);
+
+        return query;
+    }
+
+    register_system(in_system: System): void {
+        this.systems.push(in_system);
+    }
+
+    get_system(index: i32): System {
+        return this.systems[index];
+    }
+
+    create_entity(): Entity {
+        const this_rm = this.rm;
+        const rm_length = this_rm.packed_length();
+        if (rm_length > 0) {
+            const id = this_rm.packed_pop();
+            this._create_entity(id);
+            return id;
+        } else {
+            if (this.entity_id == 0) {
+                const mask_length: i32 = <i32>Math.ceil(<f32>this.component_id / 32.0);
+                const this_empty = this.empty;
+                const this_arch = this.arch;
+
+                this_empty.set_mask(new Uint32Array(mask_length));
+
+                this_arch.set(this_empty.mask_string(), this_empty);
+            }
+            assert(this.entity_id != this.MAX_ENTITIES, "Maximum entity limit reached");
+
+            this._create_entity(this.entity_id);
+            return this.entity_id++;
+        }
+    }
+
+    destroy_entity(id: Entity, defer: bool = this.DEFAULT_DEFER): void {
+        const this_to_destroy = this.to_destroy;
+
+        if (defer) {
+            this_to_destroy.add(id);
+        } else {
+            const this_ent = this.ent;
+            const this_rm = this.rm;
+
+            const ent_arch = this_ent[id];
+
+            ent_arch.sset_remove(id);
+            this_to_destroy.remove(id);
+            this_rm.add(id);
+        }
+    }
+
+    destroy_pending(): void {
+        const this_to_destroy = this.to_destroy;
+        while (this_to_destroy.packed_length() > 0) {
+            this.destroy_entity(this_to_destroy.packed_value(0), false)
+        }
+
+        this_to_destroy.reset_packed(false);
+    }
+
+    add_component(id: Entity, cmp: Component, defer: bool = this.DEFAULT_DEFER): void {
+        assert(this._valid_id(id), "Invalid entity id");
+
+        const i: u32 = cmp.get_id();
+        if (defer) {
+            const this_to_update = this.to_update;
+            this_to_update.add(id);
+        } else {
+            const this_ent = this.ent;
+            let this_ent_arch = this_ent[id];
+            const ent_mask = this_ent_arch.get_mask();
+
+            if (!this._has_component(ent_mask, i)) {
+                this_ent_arch.sset_remove(id);
+                const arch_change = this._arch_change(this_ent_arch, i);
+                if (arch_change) {
+                    this_ent[id] = arch_change;
+                    this_ent_arch = this_ent[id];
+                }
+                
+                this_ent_arch.sset_add(id);
+            }
+        }
+
+        const this_update_to = this.update_to;
+        if (!this._has_component(this_update_to[id].get_mask(), i)) {
+            const arch_change = this._arch_change(this_update_to[id], i);
+            if (arch_change) {
+                this_update_to[id] = arch_change;
+            }
+        }
+    }
+
+    remove_component(id: Entity, cmp: Component, defer: bool = this.DEFAULT_DEFER): void {
+        assert(this._valid_id(id), "Invalid entity id");
+        
+        const i: u32 = cmp.get_id();
+        if (defer) {
+            const this_to_update = this.to_update;
+            this_to_update.add(id);
+        } else {
+            const this_ent = this.ent;
+            let this_ent_arch = this_ent[id];
+            const ent_mask = this_ent_arch.get_mask();
+
+            if (this._has_component(ent_mask, i)) {
+                this_ent[id].sset_remove(id);
+                const arch_change = this._arch_change(this_ent_arch, i);
+                if (arch_change) {
+                    this_ent[id] = arch_change;
+                    this_ent_arch = arch_change;
+                }
+                this_ent_arch.sset_add(id);
+            }
+        }
+
+        const this_update_to = this.update_to;
+        if (this._has_component(this_update_to[id].get_mask(), i)) {
+            const arch_change = this._arch_change(this_update_to[id], i);
+            if (arch_change) {
+                this_update_to[id] = arch_change
+            }
+        }
+    }
+
+    update_pending(): void {
+        const this_to_update = this.to_update;
+        const this_update_to = this.update_to;
+        const this_ent = this.ent;
+
+        const arr = this_to_update.get_packed();
+        for (let i = 0, len = arr.length; i < len; i++) {
+            const id = arr[i];
+
+            if (this._valid_id(id)) {
+                this_ent[id].sset_remove(id);
+                this_ent[id] = this_update_to[id];
+                this_ent[id].sset_add(id);
+            }
+        }
+
+        this_to_update.reset_packed(true);
+    }
+
+    update(dt: f32 = 0.0): void {
+        const this_systems = this.systems;
+        for (let i = 0, len = this_systems.length; i < len; i++) {
+            const system = this_systems[i];
+            system.update(dt);
+        }
+
+        this.destroy_pending();
+        this.update_pending();
     }
 
     to_store(): Uint8Array {
@@ -500,15 +489,6 @@ export class ECS {
     from_store_bytes(bytes: Uint8Array): void {
         const view = new DataView(bytes.buffer);
         this.from_store(view, 0);
-    }
-
-    private _destroy_all(): void {
-        for (let i: u32 = 0, len = this.entity_id; i < len; i++) {
-            this.destroy_entity(i);
-        }
-
-        this.rm.clear();
-        this.entity_id = 0;
     }
 
     from_store(view: DataView, start: u32): void {
