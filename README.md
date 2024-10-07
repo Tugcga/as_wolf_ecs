@@ -1,6 +1,6 @@
 ## What is it?
 
-This is a port of the [Wolf ECS](https://github.com/EnderShadow8/wolf-ecs) system into AssemblyScript. This repository should be used as part of another AssemblyScript project. The architecture uses the SoA approach to store data for components. In this case, for each data field of the component, the array with values for all entities is created. This architecture uses more memory, but it is more performance compared to the object-based architecture.
+This is a port of the [Wolf ECS](https://github.com/EnderShadow8/wolf-ecs) system into [AssemblyScript](https://github.com/AssemblyScript/assemblyscript). This repository should be used as part of another AssemblyScript project. The architecture uses the SoA approach to store data for components. In this case, for each data field of the component, the array with values for all entities is created. This architecture uses more memory, but it is more performance compared to the object-based architecture.
 
 ## Ho to use
 
@@ -122,3 +122,140 @@ These bytes can be stored anywhere and used later to restore the ECS state. The 
 ```typescript
 ecs.from_store_bytes(bytes);
 ```
+
+## Defer mode
+
+It's possible to create ECS instance with activated defer mode
+```typescript
+const ecs = new ECS(10000, true);
+```
+
+In this mode all changes to entities (add or remove components, destroy entity) are not applied immediately, but written to a special buffer. To apply all these changes it's necessary to call ```ecs.update_pending()``` (for component changes) and `````ecs.destroy_pending()``` (for entity destruction) manually. When all changes have been made by systems, both of these methods are automatically called at the end of the ```ecs.update()``` method.
+
+## Performance
+
+The original [Wolf ECS] (https://github.com/EnderShadow8/wolf-ecs) is one of the fastest ECS libraries for JavaScript. Current AssemblyScript implementation has almost the same performance. This implementation of ECS is heavily using access to data stored in arrays. The performance of get/set data to type arrays (such as ```Int32Array```, ```Float32Array``` and so on) in JavaScript is slightly higher than set/get data to ```StaticArray``` in AssemblyScript. So the implementation of the architecture used cannot be much more efficient in AssemblyScript than in JavaScript.
+
+## API
+
+### ECS class
+
+#### Basic methods
+
+* ```create_entity(): Entity``` Create new entity.
+
+* ```destroy_entity(id: Entity): void```  Destroy specific entity
+
+* ```define_component(names: Array<Symbol>, types: Array<Type>): Component``` Create and return new component with specific field names and types
+
+* ```add_component(id: Entity, cmp: Component): void``` Add specific component to the entity
+
+* ```remove_component(id: Entity, cmp: Component): void``` Remove component from the entity
+
+* ```create_query(raw_queries: Array<RawQuery>): Query``` Create and return new query. ```raw_queries``` is an array of components with modificators
+
+* ```register_system(in_system: System): void```  Add system to the list of systems. This will allow to execute ```update``` method of the system automatically
+
+* ```update(dt: f32 = 0.0): void```  Call update methods of all registered systems
+
+* ```destroy_pending(): void``` and ```update_pending(): void``` Apply changes with active ```deffer`` mode
+
+#### Get ECS data
+
+* ```get_max_entities(): u32```  Return the maximum number of entities
+
+* ```get_component(component_id: i32): Component```  Return component by specific index
+
+* ```get_system(index: i32): System```  Return system by specific index
+
+* ```get_entity_archetype(entity: Entity): Archetype```  Return archetype of the specific entity
+
+* ```toString(): string``` Return string with  ECS content description (for debug purpose primary)
+
+#### Serialization
+
+* ```to_store(): Uint8Array``` Store ECS state into array of bytes
+
+* ```from_store_bytes(bytes: Uint8Array): void``` Restore ECS state from array of bytes
+
+### Query class
+
+#### Iterations
+
+* ```iterator_start(): void``` Reset iterator
+
+* ```iterator_has(): bool``` Return ```true``` if there are entities for iteration, ```false``` if all entities was iterated
+
+* ```iterator_get(): Entity``` Return current iterated entity
+
+* ```for_each(callback: (id: Entity, ecs: ECS) => void): void``` Execute anonimus input function for all entities, match the query
+
+#### Public methods for internal use
+
+These method should not be used by users
+
+* ```static match(target: Uint32Array, mask: QueryMask): bool```
+
+* ```add_archetype(arch: Archetype): void```
+
+* ```get_archetypes(): Array<Archetype>``` Return all archetypes, match the query
+
+* ```get_mask(): QueryMask```
+
+* ```get_ecs(): ECS``` Return current instance of the ECS
+
+* ```toString(): string```
+
+### Component class
+
+#### Data access
+
+Each method from the following series return array with component data of the specific type. The argument is the name of the component field
+* ```get_component_array_i8(name: Symbol): StaticArray<i8>```
+* ```get_component_array_i16(name: Symbol): StaticArray<i16>```
+* ```get_component_array_i32(name: Symbol): StaticArray<i32>```
+* ```get_component_array_i64(name: Symbol): StaticArray<i64>```
+* ```get_component_array_u8(name: Symbol): StaticArray<u8>```
+* ```get_component_array_u16(name: Symbol): StaticArray<u16>```
+* ```get_component_array_u32(name: Symbol): StaticArray<u32```
+* ```get_component_array_u64(name: Symbol): StaticArray<u64>```
+* ```get_component_array_f32(name: Symbol): StaticArray<f32>```
+* ```get_component_array_f64(name: Symbol): StaticArray<f64>```
+* ```get_component_array_bool(name: Symbol): StaticArray<bool>```
+
+#### Get data
+
+* ```get_component_array_type(name: Symbol): Type``` Return type of the specific field
+
+* ```get_id(): u32``` Return index of the component
+
+* ```toString(): string``` Return string representaion of the component
+
+#### Public methods for internal use
+
+These method should not be used by users
+
+* ```store_length(): u32```
+* ```to_store(): Uint8Array```
+* ```from_store(view: DataView, start: u32): void``` 
+
+### Archetype class
+
+#### Get data
+
+* ```get_mask(): Uint32Array``` Return array with flags of assigned components. These flags splitted into 32-bits pieces and decoded by ```u32``` values.
+*  ```get_entities(): Array<Entity>``` Return array of entities with a given archetype
+* ```toString(): string``` Return string representation of the archetype (mostly for debug purpose)
+
+#### #### Public methods for internal use
+
+These method should not be used by users
+
+* mask_string(): string```
+* ```sset_remove(value: u32): void```
+* ```sset_add(value: u32): void```
+* ```get_change_length(): i32```
+* ```get_change_value(index: i32): Archetype | null```
+* ```set_change_value(index: u32, value: Archetype): void```
+* ```set_mask(in_mask: Uint32Array): void```
+* ```has(x: u32): bool```
