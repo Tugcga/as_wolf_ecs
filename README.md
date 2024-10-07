@@ -2,7 +2,7 @@
 
 This is a port of the [Wolf ECS](https://github.com/EnderShadow8/wolf-ecs) system into [AssemblyScript](https://github.com/AssemblyScript/assemblyscript). This repository should be used as part of another AssemblyScript project. The architecture uses the SoA approach to store data for components. In this case, for each data field of the component, the array with values for all entities is created. This architecture uses more memory, but it is more performance compared to the object-based architecture.
 
-## Ho to use
+## How to use
 
 Make the necessary imports
 ```typescript
