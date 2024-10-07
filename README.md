@@ -251,7 +251,7 @@ These method should not be used by users
 
 These method should not be used by users
 
-* mask_string(): string```
+* ```mask_string(): string```
 * ```sset_remove(value: u32): void```
 * ```sset_add(value: u32): void```
 * ```get_change_length(): i32```
