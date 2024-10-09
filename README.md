@@ -1,4 +1,4 @@
-<p style="text-align:center;">![](https://github.com/user-attachments/assets/3ab1610b-c878-40a1-bf5e-0a75fbc3173d)</p>
+![](https://github.com/user-attachments/assets/3ab1610b-c878-40a1-bf5e-0a75fbc3173d)
 
 ## What is it?
 
