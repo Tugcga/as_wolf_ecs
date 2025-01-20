@@ -132,7 +132,7 @@ It's possible to create ECS instance with activated defer mode
 const ecs = new ECS(10000, true);
 ```
 
-In this mode all changes to entities (add or remove components, destroy entity) are not applied immediately, but written to a special buffer. To apply all these changes it's necessary to call ```ecs.update_pending()``` (for component changes) and `````ecs.destroy_pending()``` (for entity destruction) manually. When all changes have been made by systems, both of these methods are automatically called at the end of the ```ecs.update()``` method.
+In this mode all changes to entities (add or remove components, destroy entity) are not applied immediately, but written to a special buffer. To apply all these changes it's necessary to call ```ecs.update_pending()``` (for component changes) and ```ecs.destroy_pending()``` (for entity destruction) manually. When all changes have been made by systems, both of these methods are automatically called at the end of the ```ecs.update()``` method.
 
 ## Performance
 
